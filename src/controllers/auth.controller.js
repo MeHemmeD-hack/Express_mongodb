@@ -15,7 +15,7 @@ const transporter = nodemailer.createTransport({
         pass: appconfig.EMAIL_PASSWORD,
     },
     tls: {
-        rejectUnauthorized: false, 
+        rejectUnauthorized: false,
     },
 });
 
@@ -79,37 +79,96 @@ const login = async (req, res, next) => {
         next(err);
     }
 };
+
+
 const verifyEmail = async (req, res, next) => {
-    
-    const user = req.user;
-    console.log(user);
-    const email = req.user.email
-
-    const mailOptions = {
-        from: appconfig.EMAIL,
-        to: email,
-        subject: "Hello from Div Mongo Blog",
-        text: "Verify your Email address",
-    };
-
-    // console.log("mailOptions", mailOptions); 
-
-
-    transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-            console.error("Error sending email: ", error);
-            return res.status(500).json({
-                message: error.message,
-                error,
-            })
-        } else {
-            console.log("Email sent: ", info);
-            return res.json({ message: "Check your email" })
+    try {
+        const user = await User.findById(req.user._id); 
+        if (!user) {
+            return res.status(404).json({ message: "İstifadəçi tapılmadı." });
         }
-    });
-}
+
+       
+        if (user.isEmailVerified) {
+            return res.status(400).json({ message: "Bu email artıq təsdiqlənmişdir." });
+        }
+
+       
+        const verifyCode = Math.floor(100000 + Math.random() * 900000); 
+        const now = new Date();
+        const verifyExpired = new Date(now.getTime() + 5 * 60 * 1000); 
+
+       
+        user.verifyCode = verifyCode;
+        user.verifyExpired = verifyExpired;
+
+        await user.save()
+
+        
+        const email = user.email;
+        const mailOptions = {
+            from: appconfig.EMAIL,
+            to: email,
+            subject: "Təsdiq kodu",
+            text: `Təsdiq kodunuz: ${verifyCode}`,
+        };
+
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.error("Email göndərilmə xətası: ", error);
+                return res.status(500).json({ message: "Email göndərilmə xətası baş verdi." });
+            } else {
+                return res.status(200).json({ message: "Təsdiq kodu emailinizə göndərildi." });
+            }
+        });
+    } catch (err) {
+        console.error("Verify email error:", err);
+        next(err);
+    }
+};
+
+
+
+const checkVerifyCode = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(400).send("İstifadəçi tapılmadı.");
+        }
+
+        const code = req.body.code;
+        if (!user.verifyCode) {
+            return res.status(400).send("Təsdiq kodu tapılmadı.");
+        }
+
+        if (user.verifyCode !== Number(code)) {
+            return res.status(400).send("Kod düzgün deyil.");
+        }
+
+        if (Date.now() > user.verifyExpired) {
+            return res.status(400).send("Təsdiq kodunun vaxtı bitmişdir.");
+        }
+
+       
+        user.verifyCode = null;
+        user.verifyExpired = null;
+        user.isEmailVerified = true;
+        await user.save();
+
+        return res.status(200).json("Emailiniz təsdiqləndi.");
+    } catch (err) {
+        console.error("checkVerifyCode error:", err);
+        return res.status(500).send("Server xətası.");
+    }
+};
+
+
+
+
+
 export const AuthController = () => ({
     login,
     register,
-    verifyEmail
+    verifyEmail,
+    checkVerifyCode
 })
