@@ -1,10 +1,9 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose from "mongoose";
 const userSchema = new mongoose.Schema({
     fullName: {
         type: String,
         required: true,
         trim: true,
-
     },
     email: {
         type: String,
@@ -17,7 +16,10 @@ const userSchema = new mongoose.Schema({
         required: true,
         trim: true,
     },
-    isEmailVerified: { type: Boolean, default: false },
+    isEmailVerified: {
+        type: Boolean,
+        default: false
+    },
     verifyCode: {
         type: Number,
         default: null
@@ -26,6 +28,10 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    blogs: [{
+        type: mongoose.Schema.ObjectId,
+        ref: "Blog"
+    }]
 })
 
-export const User = mongoose.model('user', userSchema) 
+export const User = mongoose.model('User', userSchema) 

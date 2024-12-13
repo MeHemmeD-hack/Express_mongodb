@@ -4,7 +4,7 @@ import { appconfig } from "../../consts.js";
 
 export const useAuth = async (req, res, next) => {
 
-    console.log("useAuth middleware");
+    console.log("useAuth middleware ist olundu");
 
     if (!req.headers.authorization || !req.headers.authorization.startsWith("Bearer")) {
         return res.status(401).json({
@@ -20,7 +20,7 @@ export const useAuth = async (req, res, next) => {
     try {
         const jwtResult = jwt.verify(access_token, appconfig.SECRET_KEY)
 
-        const user = await User.findById(jwtResult.sub).select("_id email fullname")
+        const user = await User.findById(jwtResult.sub).select("_id email fullName isEmailVerified verifyExpired verifyCode")
         if (!user) return res.status(401).json({ message: "User not found!" });
 
         req.user = user;
