@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { User } from "../models/user.model.js";
 import { appconfig } from "../../consts.js";
 import nodemailer from "nodemailer"
-import crypto from 'crypto'
+// import { v4 as uuidv4 } from 'uuid'
 
 const transporter = nodemailer.createTransport({
     service: "Gmail",
@@ -190,53 +190,21 @@ const checkVerifyCode = async (req, res) => {
 
 const forgetPassword = async (req, res) => {
     try {
-        const validData = await Joi.object({
-            email: Joi.string()
-                .email()
-                .required()
-                .messages({
-                    "string.email": "Valid email is required!",
-                    "string.empty": "Email field cannot be empty!",
-                }),
-        }).validateAsync(req.body, { abortEarly: false });
-
-        const { email } = validData;
-
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(404).json({
-                message: "No account found with this email address!"
-            });
-        }
-
-        const resetToken = crypto.randomBytes(32).toString('hex');
-        const tokenExpireTime = Date.now() + 3600000; // 1 saat
-
-        user.resetPasswordToken = resetToken;
-        user.resetPasswordExpires = tokenExpireTime;
-        await user.save();
-
-        const resetURL = `http://localhost:5173/reset-password/${resetToken}`;
-
-        console.log(user.resetToken)
         const transporter = nodemailer.createTransport({
             service: 'Gmail',
             auth: {
                 user: appconfig.EMAIL,
                 pass: appconfig.EMAIL_PASSWORD,
             },
-            tls: {
-                rejectUnauthorized: false, 
-            },
+            tls: { rejectUnauthorized: false },
         });
-        
 
         const mailOptions = {
-            to: user.email,
+            to: req.userEmail,
             subject: 'Password Reset',
             html: `
                 <p>Click the link below to reset your password:</p>
-                <a href="${resetURL}" target="_blank">Reset Password</a>
+                <a href="${req.resetURL}" target="_blank">Reset Password</a>
                 <p>If you did not request this, please ignore this email.</p>
             `,
         };
@@ -246,43 +214,45 @@ const forgetPassword = async (req, res) => {
         return res.status(200).json({
             message: "Password reset link has been sent to your email address.",
         });
-
     } catch (error) {
         console.error("Forget Password Error:", error);
-        res.status(500).json({ message: 'Server error', error });
+        return res.status(500).json({ message: "Server error while sending email." });
     }
 };
 
 
-const resetPassword=async(req, res)=>{
-    const { token } = req.params;
-    const { newPassword, confirmPassword } = req.body;
 
-    if (newPassword !== confirmPassword) {
-        return res.status(400).json({ message: "Şifrələr uyğun gəlmir!" });
-    }
-
+const resetPassword = async (req, res) => {
     try {
-        const user = await User.findOne({ 
-            resetPasswordToken: token, 
-            resetPasswordExpires: { $gt: Date.now() } 
-        });
+        const { token } = req.params;
+        const { newPassword, confirmPassword } = req.body;
 
+        console.log("Token:", token);
+        console.log("Şifrələr:", newPassword, confirmPassword);
+
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({ message: "Şifrələr uyğun gəlmir" });
+        }   
+        
+
+        const user = await User.findOne({ resetPasswordToken: token });
+        console.log("Tapılan user:", user);
         if (!user) {
-            return res.status(400).json({ message: "Yanlış və ya müddəti keçmiş sıfırlama tokeni" });
+            return res.status(404).json({ message: "Token etibarsızdır və ya istifadəçi tapılmadı" });
         }
-
-        user.password = newPassword; 
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpires = undefined;
-
+        
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        user.resetToken = undefined; 
         await user.save();
-        return res.status(200).json({ message: "Şifrə uğurla sıfırlandı!" });
+        console.log("Gələn token:", token);
+        
+        res.status(200).json({ message: "Şifrə uğurla yeniləndi" });
     } catch (error) {
-        console.error("Şifrə sıfırlanarkən xəta:", error);
-        return res.status(500).json({ message: "Şifrə sıfırlanarkən xəta baş verdi." });
+        console.error("Xəta baş verdi:", error.message);
+        res.status(500).json({ message: "Şifrə sıfırlanarkən xəta baş verdi." });
     }
-}
+};
 
 
 export const AuthController = () => ({

@@ -28,6 +28,12 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    resetPasswordToken: {
+        type: String,
+    },
+    resetPasswordExpires: {
+        type: Date,
+    },
     blogs: [{
         type: mongoose.Schema.ObjectId,
         ref: "Blog"

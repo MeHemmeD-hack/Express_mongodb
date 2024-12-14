@@ -5,6 +5,14 @@ import path from "path"
 import fs from "fs"
 import { fileURLToPath } from "url";
 
+// const num =0
+
+// if(!isNaN(num)){
+//     res.status(200).json(num)
+// }
+// else{
+//     res.status(500).json(num)
+// }
 const create = async (req, res, next) => {
     const user = req.user
 

@@ -5,7 +5,9 @@ import { useAuth } from "../middlewares/auth.middleware.js";
 export const blogRoute=Router()
 const controller=BlogController()
 
-blogRoute.post("/create",useAuth, controller.create)
+blogRoute.post("/create",
+    // useAuth
+     controller.create)
 blogRoute.get("/list", controller.getList)
 blogRoute.get("/:id",controller.getById)
 blogRoute.put("/edit/:id",controller.blogEdit)
