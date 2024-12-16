@@ -2,8 +2,7 @@ import Joi from "joi";
 import { Blog } from "../models/blog.model.js";
 import multer from "multer";
 import path from "path"
-import fs from "fs"
-import { fileURLToPath } from "url";
+import mongoose from "mongoose";
 
 // const num =0
 
@@ -14,32 +13,40 @@ import { fileURLToPath } from "url";
 //     res.status(500).json(num)
 // }
 const create = async (req, res, next) => {
+
     const user = req.user
-
-    if (!user.isEmailVerified) return res.status(400).json({
-        message: "User email is not verified."
-    })
-
-    const { title, content } = await Joi.object({
-        title: Joi.string().trim().min(3).max(50).required(),
-        content: Joi.string().trim().min(10).max(1000).required(),
-    }).validateAsync(req.body, { abortEarly: false })
-        .catch(err => {
-            return res.status(422).json({
-                message: 'xeta bash verdi.',
-                error: err.details.map(item => item.message)
-
-            })
+    try {
+        if (!user.isEmailVerified) return res.status(400).json({
+            message: "User email is not verified."
         })
-    await Blog.create({
-        title,
-        content,
-        user: user.id
-    }).then(newBlog => res.status(201).json(newBlog))
-        .catch(error => res.status(500).json({
-            message: "xeta",
-            error
-        }))
+
+        const { title, content } = await Joi.object({
+            title: Joi.string().trim().min(3).max(50).required(),
+            content: Joi.string().trim().min(10).max(1000).required(),
+            img: Joi.object().required()
+        }).validateAsync({ ...req.body, img: req.file, }, { abortEarly: false })
+            .catch(err => {
+                return res.status(422).json({
+                    message: 'xeta bash verdi.',
+                    error: err.details.map(item => item.message)
+
+                })
+            })
+        await Blog.create({
+            title,
+            content,
+            user: user.id,
+            imgPath: req.file.filename
+        }).then(newBlog => res.status(201).json(newBlog))
+            .catch(error => res.status(500).json({
+                message: "xeta",
+                error
+            }))
+    } catch (error) {
+        res.status(500).json({ message: "Xəta baaaaş verdi.", error });
+
+    }
+
 }
 
 const getList = async (req, res, next) => {
@@ -118,21 +125,12 @@ const blogDelete = async (req, res, next) => {
     }
 }
 
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const uploadsDir = path.join(__dirname, "uploads", "blogs");
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, uploadsDir); 
+        cb(null, "uploads/");
     },
     filename: function (req, file, cb) {
-        cb(null, Date.now() + path.extname(file.originalname)); 
+        cb(null, Date.now() + path.extname(file.originalname));
     }
 });
 
@@ -151,20 +149,20 @@ function checkFileType(file, cb) {
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 2000000 }, 
+    limits: { fileSize: 2000000 },
     fileFilter: function (req, file, cb) {
         checkFileType(file, cb);
     }
 }).single('myFile');
 
-const uploadFilesForBlog =async (req, res) => {
-    const blogId = req.params.blogId;
-
+const uploadFilesForBlog = async (req, res) => {   
     try {
-        const blog = await Blog.findById(blogId);
-        if (!blog) {
-            return res.status(404).json({ message: "Blog tapılmadı." });
-        }
+        const userId = req.user._id; 
+        console.log("İstifadəçi ID-si:", userId);
+
+        const blog = await Blog.findOne({ user: userId });
+        console.log("Tapılan blog:", blog);
+
 
         upload(req, res, async (err) => {
             if (err) {
@@ -175,7 +173,7 @@ const uploadFilesForBlog =async (req, res) => {
                 return res.status(400).json({ message: "Fayl seçilməyib." });
             }
 
-            blog.filePath = req.file.path;
+            blog.imgPath = req.file.path;
             await blog.save();
 
             res.status(200).json({

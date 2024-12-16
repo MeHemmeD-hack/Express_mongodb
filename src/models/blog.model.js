@@ -15,9 +15,9 @@ import mongoose from "mongoose";
         ref:"User",
         require: true
     }, 
-    filePath: {
+    imgPath: {
         type: String, 
-        default: null,
+        require: true
     }
 
  }) 
